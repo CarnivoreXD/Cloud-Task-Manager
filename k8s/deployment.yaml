@@ -1,0 +1,112 @@
+# ============================================================
+# Kubernetes Deployment for Cloud Task Manager
+# Deploy to EKS: kubectl apply -f k8s/
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-task-manager
+  labels:
+    app: cloud-task-manager
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloud-task-manager
+  template:
+    metadata:
+      labels:
+        app: cloud-task-manager
+    spec:
+      containers:
+        - name: web
+          image: <AWS_ACCOUNT_ID>.dkr.ecr.us-west-2.amazonaws.com/cloud-task-manager:latest
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - secretRef:
+                name: task-manager-secrets
+          resources:
+            requests:
+              cpu: "128m"
+              memory: "256Mi"
+            limits:
+              cpu: "512m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+# ============================================================
+# Service - Exposes the deployment inside the cluster
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-task-manager-svc
+  labels:
+    app: cloud-task-manager
+spec:
+  type: ClusterIP
+  selector:
+    app: cloud-task-manager
+  ports:
+    - port: 80
+      targetPort: 5000
+      protocol: TCP
+---
+# ============================================================
+# Ingress - Exposes the service to the internet via ALB
+# Requires: AWS Load Balancer Controller installed on EKS
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cloud-task-manager-ingress
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cloud-task-manager-svc
+                port:
+                  number: 80
+---
+# ============================================================
+# HPA - Auto-scales pods for extra credit (scalability)
+# ============================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cloud-task-manager-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cloud-task-manager
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

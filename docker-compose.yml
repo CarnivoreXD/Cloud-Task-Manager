@@ -1,0 +1,40 @@
+# ============================================================
+# Local Development - Docker Compose
+# Run: docker-compose up --build
+# ============================================================
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_APP=app.main:app
+      - SECRET_KEY=local-dev-secret-key
+      - DATABASE_URL=sqlite:///tasks.db
+      # Leave Cognito vars empty for local dev (uses local login form)
+      - COGNITO_USER_POOL_ID=
+      - COGNITO_CLIENT_ID=
+      - COGNITO_DOMAIN=
+      - APP_URL=http://localhost:5000
+    volumes:
+      - ./app:/app/app   # Hot reload during development
+    # Override CMD for development with auto-reload
+    command: ["python", "-m", "flask", "run", "--host", "0.0.0.0", "--port", "5000", "--debug"]
+
+  # Optional: PostgreSQL for testing production-like setup locally
+  # Uncomment below when you want to test with Postgres before deploying
+  # db:
+  #   image: postgres:15
+  #   environment:
+  #     POSTGRES_DB: taskmanager
+  #     POSTGRES_USER: taskuser
+  #     POSTGRES_PASSWORD: localdevpassword
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+
+# volumes:
+#   pgdata:

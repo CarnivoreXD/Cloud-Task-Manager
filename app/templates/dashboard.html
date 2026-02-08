@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Cloud Task Manager{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-kanban me-2"></i>My Tasks</h2>
+    <a href="{{ url_for('create_task') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>New Task
+    </a>
+</div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card text-center p-3 border-0 shadow-sm">
+            <div class="text-muted small">Total</div>
+            <div class="h3 mb-0 text-dark">{{ stats.total }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center p-3 border-0 shadow-sm">
+            <div class="text-muted small">Pending</div>
+            <div class="h3 mb-0 text-warning">{{ stats.pending }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center p-3 border-0 shadow-sm">
+            <div class="text-muted small">In Progress</div>
+            <div class="h3 mb-0 text-primary">{{ stats.in_progress }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center p-3 border-0 shadow-sm">
+            <div class="text-muted small">Completed</div>
+            <div class="h3 mb-0 text-success">{{ stats.completed }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Cards -->
+{% if tasks %}
+<div class="row g-3">
+    {% for task in tasks %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6 class="card-title mb-0">{{ task.title }}</h6>
+                    <span class="badge bg-{{ 'danger' if task.priority == 'high' else ('warning' if task.priority == 'medium' else 'secondary') }}">
+                        {{ task.priority }}
+                    </span>
+                </div>
+                <p class="card-text text-muted small">{{ task.description[:100] }}{% if task.description|length > 100 %}...{% endif %}</p>
+
+                <!-- Status Dropdown -->
+                <div class="mb-3">
+                    <select class="form-select form-select-sm status-select" data-task-id="{{ task.id }}">
+                        <option value="pending" {{ 'selected' if task.status == 'pending' }}>⏳ Pending</option>
+                        <option value="in_progress" {{ 'selected' if task.status == 'in_progress' }}>🔄 In Progress</option>
+                        <option value="completed" {{ 'selected' if task.status == 'completed' }}>✅ Completed</option>
+                    </select>
+                </div>
+
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">{{ task.created_at.strftime('%b %d, %Y') }}</small>
+                    <div>
+                        <a href="{{ url_for('edit_task', task_id=task.id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" action="{{ url_for('delete_task', task_id=task.id) }}" class="d-inline"
+                              onsubmit="return confirm('Delete this task?')">
+                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="bi bi-inbox display-1"></i>
+    <p class="mt-3">No tasks yet. Create your first task to get started!</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.status-select').forEach(select => {
+    select.addEventListener('change', async function() {
+        const taskId = this.dataset.taskId;
+        const status = this.value;
+        try {
+            const resp = await fetch(`/task/${taskId}/status`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status})
+            });
+            if (resp.ok) location.reload();
+        } catch (e) {
+            console.error('Status update failed', e);
+        }
+    });
+});
+</script>
+{% endblock %}
